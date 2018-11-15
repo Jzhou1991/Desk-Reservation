@@ -1,0 +1,19 @@
+@isTest
+public class DeskServiceTest {
+    
+    static testMethod void deleteRelatedReservationsTest(){
+        Office__c o = new Office__c(Name = 'Test Office',  Number_of_Floors__c = 2);
+        Office__c o2 = new Office__c(Name = 'Test Office2',  Number_of_Floors__c = 2);
+        insert new List<Office__c>{o, o2};
+            
+        Desk__c d = new Desk__c(Office__c = o.Id, Floor_Number__c = 1);
+        insert d;
+        
+        Reservation__c resv = new Reservation__c(Name = 'Reservation 1', Desk__c = d.Id, Date__c = Date.today());
+        insert resv;
+        
+        delete d;
+        System.assertEquals(0, [SELECT COUNT() FROM Reservation__c]);
+    }
+    
+}

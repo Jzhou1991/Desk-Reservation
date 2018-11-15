@@ -1,0 +1,7 @@
+trigger DeskTrigger on Desk__c (before insert, before update, before delete) {
+    if(Trigger.isBefore){
+        if(Trigger.isDelete){
+            DeskService.deleteRelatedReservations(Trigger.old);
+        }
+    }
+}

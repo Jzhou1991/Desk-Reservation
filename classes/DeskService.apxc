@@ -1,0 +1,20 @@
+public class DeskService {
+    
+    //Method to delete reservations related to desks
+    public static void deleteRelatedReservations(List<Desk__c> desks){
+        List<Id> deskIds = new List<Id>();
+        for(Desk__c desk : desks){
+            deskIds.add(desk.Id);
+        }
+        
+        List<Reservation__c> reservations = [SELECT Id FROM Reservation__c WHERE Desk__c IN :deskIds];
+        
+        try{
+            delete reservations;            
+        }
+        catch(Exception e){
+ 			System.debug('ERROR: ' + e.getMessage());           
+        }
+    }
+    
+}

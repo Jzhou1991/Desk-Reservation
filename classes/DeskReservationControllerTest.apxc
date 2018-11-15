@@ -1,0 +1,188 @@
+@isTest
+public class DeskReservationControllerTest {
+    
+    @TestSetup
+    public static void testSetup(){
+        General_Settings__c gs = new General_Settings__c(Name = 'System Administrator Profile Id', Value__c = '00e46000000OJxYAAW');
+        insert gs;
+        
+        Office__c o = new Office__c(Name = 'Test Office',  Number_of_Floors__c = 2);
+        insert o;
+       
+        Desk__c d = new Desk__c(Office__c = o.Id, Floor_Number__c = 1);
+        Desk__c d2 = new Desk__c(Office__c = o.Id, Floor_Number__c = 1);
+        Desk__c d3 = new Desk__c(Office__c = o.Id, Floor_Number__c = 2);//Doesn't have any reservations	
+        insert new List<Desk__c>{d, d2, d3};
+        
+        Reservation__c resv = new Reservation__c(Name = 'Reservation 1', Desk__c = d.Id, Date__c = Date.today());
+        Reservation__c resv2 = new Reservation__c(Name = 'Reservation 2', Desk__c = d2.Id, Date__c = Date.today() + 1);
+        insert new List<Reservation__c>{resv, resv2};
+    }
+    
+    static testMethod void getDesksAndReservationsTest(){        
+        DeskReservationController drc = new DeskReservationController();
+        
+        Test.startTest();
+        /**
+         * 	Positive test case for checking how many Office SelectOptions are desplayed on the page
+         *  Result: 1 SelectOption should be desplayed because there is only one Office
+        **/
+        System.assertEquals(1, drc.officeSelectOptions.size());
+        System.assertEquals('Test Office', drc.officeSelectOptions.get(0).getLabel());
+        
+        Set<String> pageMessages = new Set<String>(); 
+        /**
+         * 	Negative test case for when the user clicks on the Submit button with a no Date and an office
+         * 	Results: The user should be prompted with the message: 
+         * 	- 'Please select a date.'
+        **/
+        drc.selectedDate = null;
+        drc.selectedOfficeId = drc.officeSelectOptions.get(0).getValue();  
+        drc.getDesksAndReservations();
+        
+        for(Apexpages.Message msg : ApexPages.getMessages()){
+            pageMessages.add(msg.getDetail());
+        }
+        System.assert(pageMessages.contains('Please select a date.'));
+        
+        /**
+         * 	Negative test case for when the user clicks on the Submit button with a past Date and an Office
+         * 	Results: The user should be prompted with the message: 
+         * 	- 'Please select a present or future date.'
+        **/
+        drc.selectedDate = Date.today() - 1;
+        drc.getDesksAndReservations();
+        
+        for(Apexpages.Message msg : ApexPages.getMessages()){
+            pageMessages.add(msg.getDetail());
+        }
+        System.assert(pageMessages.contains('Please select a present or future date.'));
+
+        /**
+         * 	Positive test case for when the user clicks on the Submit button and the correct Date and Office filled out.
+         * 	Results: 
+         *  - The User should successfully see the all the desks for reservation on the page. The page will display 3 desks on 2 floors in this case
+         *  - The User should be prompted with the message 'You currently have a reservation for this office and this date. To change your reservation, please cancel your current reservation and make a new reservation.'
+        **/
+        drc.selectedDate = Date.today();
+        drc.getDesksAndReservations();
+        
+        System.assert(drc.floorNumberToDeskWrappersSize == 2);
+
+        for(Apexpages.Message msg : ApexPages.getMessages()){
+            pageMessages.add(msg.getDetail());
+        }
+        System.assert(pageMessages.contains('You currently have a reservation for this date. To change your reservation, please cancel your current reservation and make a new reservation.'));
+        
+        
+        /**
+         * 	Negative test case for when there are no Desk records
+         *  Result: The user should be prompted with the message: 
+         *  - The User should be prompted with the message 'There are currently no desks available for this office and this date. Please try a different office or a different date.'
+        **/
+        delete [SELECT Id FROM Desk__c];
+        
+        drc.getDesksAndReservations();
+        System.assert(drc.floorNumberToDeskWrappersSize == 0);
+        for(Apexpages.Message msg : ApexPages.getMessages()){
+            pageMessages.add(msg.getDetail());
+        }
+        System.assert(pageMessages.contains('There are currently no desks available for this office and this date. Please try a different office or a different date.'));
+        
+        /**
+         * 	Negative test case for when there are no Office records
+         *  Result: 0 SelectOptions should be desplayed
+        **/
+        delete [SELECT Id FROM Office__c];
+		drc = new DeskReservationController();
+        System.assertEquals(0, drc.officeSelectOptions.size());
+        
+        /**
+         * 	Negative test case for when there is no General Settings with the name 'System Administrator Profile Id'
+         *  Result: The user should be prompted with the message: 
+         *  - Please make sure the value for System Administror Profile Id has been set in General Settings.
+        **/
+        delete [SELECT Id FROM General_Settings__c WHERE Name = 'System Administrator Profile Id'];
+        drc = new DeskReservationController();
+        for(Apexpages.Message msg : ApexPages.getMessages()){
+            pageMessages.add(msg.getDetail());
+        }
+        System.assert(pageMessages.contains('Please make sure the value for System Administror Profile Id has been set in General Settings.'));
+        Test.stopTest();
+    }
+    
+    static testMethod void reserveDeskTest(){
+        Office__c office = [SELECT Id, Name FROM Office__c WHERE Name = 'Test Office'];
+        
+        DeskReservationController drc = new DeskReservationController();
+        
+        Test.startTest();
+        /**
+         * 	Negative test case for when the user clicks on the Submit button without selecting a Desk
+         * 	Resulta: The user should be prompted with the message: 
+         * 	- 'Please select a desk to reserve.'
+        **/
+        drc.selectedOfficeId = office.Id; 
+        drc.selectedDate = Date.today() + 10;
+        drc.reserveDesk();
+        
+        Set<String> pageMessages = new Set<String>(); 
+        for(Apexpages.Message msg : ApexPages.getMessages()){
+            pageMessages.add(msg.getDetail());
+        }
+        System.assert(pageMessages.contains('Please select a desk to reserve.'));
+        
+        /**
+         * 	Position test case for when the user clicks on the Submit button with a Desk selected
+         * 	Results: A new reservation was created for Desk 3
+        **/
+		DeskReservationController.DeskWrapper selectedDeskWrapper = drc.floorNumberToDeskWrappers.get(2).get(0);
+        selectedDeskWrapper.selected = true;        
+        
+        drc.reserveDesk();
+		System.assertEquals(1, [SELECT COUNT() FROM Reservation__c WHERE Desk__r.Name = :selectedDeskWrapper.desk.Name]);
+        
+        Test.stopTest();
+    }
+    
+    static testMethod void cancelReservationsTest(){
+        Office__c office = [SELECT Id, Name FROM Office__c WHERE Name = 'Test Office'];
+        
+        DeskReservationController drc = new DeskReservationController();
+        
+        Test.startTest();
+        /**
+         * 	Position test case for checking that there are 2 Reservations
+        **/
+        drc.selectedOfficeId = office.Id; 
+        drc.selectedDate = Date.today();
+        drc.getDesksAndReservations();
+        
+        System.assertEquals(2, drc.reservationWrappers.size());
+        
+        /**
+         * 	Negative test case for when the user clicks on Cancel Reservations button with no Reservations selected on the page
+         *  Result: The user should be prompted with the message: 
+         *  -'Please select at least one reservation to cancel.'
+        **/
+        drc.cancelReservations();
+        
+        Set<String> pageMessages = new Set<String>(); 
+        for(Apexpages.Message msg : ApexPages.getMessages()){
+            pageMessages.add(msg.getDetail());
+        }
+        System.assert(pageMessages.contains('Please select at least one reservation to cancel.'));  
+        
+        /**
+         * 	Positive test case for when the user clicks on Cancel Reservations button with a Reservations selected on the page
+         *  Result: A Reservation was deleted and the total count of Reservations for the user is 1
+        **/
+        drc.reservationWrappers.get(0).selected = true;
+        drc.cancelReservations();
+        
+        drc.getDesksAndReservations();
+        System.assertEquals(1, drc.reservationWrappers.size());
+        
+        Test.stopTest();        
+    }
+}

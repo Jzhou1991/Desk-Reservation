@@ -1,0 +1,100 @@
+@isTest
+public class ReservationServiceTest {
+    
+    static testMethod void validateSameDateReservationsForOwner(){
+        Profile p = [SELECT Id FROM Profile WHERE Name = 'Sales'];
+        
+        User salesUser = new User(
+            FirstName = 'Sales', 
+            LastName = 'User', 
+            ProfileId = p.Id,
+            Username = 'salesuser2@test.com',
+            Alias = 'suser',
+            Email = 'salesuser2@test.com',
+            EmailEncodingKey = 'UTF-8',
+            LanguageLocaleKey = 'en_US',
+            LocaleSidKey = 'en_US',
+            TimeZoneSidKey = 'America/Chicago'
+        );
+        insert salesUser;
+                
+        Office__c o = new Office__c(Name = 'Test Office',  Number_of_Floors__c = 2);
+        insert o;
+        
+        Desk__c d = new Desk__c(Office__c = o.Id, Floor_Number__c = 1);
+        Desk__c d2 = new Desk__c(Office__c = o.Id, Floor_Number__c = 1);
+        insert new List<Desk__c>{d, d2};
+        
+        Reservation__c resv = new Reservation__c(Name = 'Reservation 1', Desk__c = d.Id, Date__c = Date.today());
+        Reservation__c resv2 = new Reservation__c(Name = 'Reservation 2', Desk__c = d.Id, Date__c = Date.today());
+        
+        Test.startTest();
+        
+        /**
+         * 	Negative test case for when inserting a new Reservation with the same date as an existing Reservation
+         * 	Results: Prompt the user with error message -  'Duplicate reservation records with the same date(' + Date.today() + ') were found in insert/update list.'
+        **/
+        try{
+            insert new List<Reservation__c>{resv, resv2};
+        }
+        catch(Exception e){
+            System.assert(e.getMessage().contains('Duplicate reservation records with the same date(' + Date.today().format() + ') were found in insert/update list.'));
+        }
+            
+        insert resv;
+        
+        /**
+         * 	Negative test case for when inserting a new Reservation with the same date as an existing Reservation
+         * 	Results: Prompt the user with error message -  'You already have a reservation on this date(' + Date.today() + '). Please select another date.'
+        **/
+        try{
+            insert resv2;
+        }
+        catch(Exception e){
+            System.assert(e.getMessage().contains('You already have a reservation on this date(' + Date.today().format() + '). Please select another date.'));
+        }
+        
+        
+       /**
+         * 	Positive test case for when the Reservation is set to an available date
+         * 	Results: Successful insert
+        **/
+        resv2.Date__c = Date.today() + 1;
+        
+        try{
+            insert resv2;
+            System.assert(true, 'Successful insertion');
+        }
+        catch(Exception e){
+            System.assert(null, e.getMessage());
+        }
+        
+
+        Reservation__c resv3 = new Reservation__c(Name = 'Reservation 3', Desk__c = d.Id, Date__c = Date.today());
+        System.runAs(salesUser){
+           /**
+			 * 	Negative test case for when there already a Reservation for the selected Desk
+			 * 	Results: Prompt the user with error message -  There is already a reservation for this desk on this date(' + Date.today() + '). Please select another date.')
+			**/
+            try{
+                insert resv3;
+            }
+            catch(Exception e){
+                System.assert(e.getMessage().contains('There is already a reservation for this desk on this date(' + Date.today().format() + '). Please select another date.'));
+            }
+            
+           /**
+         	 * 	Positive test case for when the Reservation is set to an available Desk
+         	 * 	Results: Successful insert
+        	**/
+            resv3.Desk__c = d2.Id;
+            try{
+                insert resv3;
+                System.assert(true, 'Successful insertion');
+            }
+            catch(Exception e){
+                System.assert(null, e.getMessage());
+            }
+        }        
+    }
+}

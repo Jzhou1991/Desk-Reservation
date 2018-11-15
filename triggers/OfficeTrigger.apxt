@@ -1,0 +1,10 @@
+trigger OfficeTrigger on Office__c (before insert, before update) {
+    if(Trigger.isBefore){
+        if(Trigger.isInsert){
+            DuplicateService.checkForDuplicates(null, Trigger.new);
+        }
+        if(Trigger.isUpdate){
+            DuplicateService.checkForDuplicates(Trigger.oldMap, Trigger.new);
+        }
+    }
+}

@@ -1,0 +1,249 @@
+public class DeskReservationController {
+    public Id currentProfileId{get; set;}
+    public Id currentUserId{get; set;}
+    public Boolean isSystemAdmin{get; set;}
+    public Id selectedOfficeId{get; set;}
+    public Date selectedDate{get; set;}
+    public Map<Id, Office__c> officeMap{get; set;}
+    public Map<Integer, List<DeskWrapper>> floorNumberToDeskWrappers{get; set;}
+    public List<ReservationWrapper> reservationWrappers{get; set;}
+    public Boolean userHasReservationForSelectedDate{get; set;}
+    public Boolean noDesksAvailable{get; set;}
+    
+    public DeskReservationController(){
+        currentUserId = UserInfo.getUserId();
+        currentProfileId = UserInfo.getProfileId();
+        
+		General_Settings__c systemAdminProfileIdGS = General_Settings__c.getValues('System Administrator Profile Id');
+        if(systemAdminProfileIdGS == null || systemAdminProfileIdGS.Value__c == null){
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.severity.ERROR, 'Please make sure the value for System Administror Profile Id has been set in General Settings.'));
+            return; 
+        }
+        
+        isSystemAdmin = systemAdminProfileIdGS.Value__c.contains(currentProfileId) ? true : false;
+        selectedOfficeId = !officeSelectOptions.isEmpty() ? officeSelectOptions.get(0).getValue() : null;
+        selectedDate = Date.today();
+        officeMap = new Map<Id, Office__c>();
+        floorNumberToDeskWrappers = new Map<Integer, List<DeskWrapper>>();
+        reservationWrappers = new List<ReservationWrapper>();
+        userHasReservationForSelectedDate = false;
+        noDesksAvailable = false;
+    }
+    
+    //Method to query for Desks and related Reservations
+    public void getDesksAndReservations(){
+        floorNumberToDeskWrappers = new Map<Integer, List<DeskWrapper>>();
+        reservationWrappers = new List<ReservationWrapper>();
+        userHasReservationForSelectedDate = false;
+        noDesksAvailable = false;
+		Integer unavailableDesksCount = 0;
+        
+        if(selectedDate == null){
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.severity.ERROR, 'Please select a date.'));
+            return;            
+        }
+        
+        //If a past date is selected
+        if(selectedDate < Date.today()){
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.severity.ERROR, 'Please select a present or future date.'));
+            return;
+        }
+
+        if(selectedOfficeId != null){
+            //Query for all the Desks for the selected Office
+            Map<Id, Desk__c> queriedDesksMap = new Map<Id, Desk__c>([SELECT Id, Name, Office__r.Name, Floor_Number__c FROM Desk__c WHERE Office__c = :selectedOfficeId ORDER BY Name]);
+            
+            //Query and loop through all the Reservations that the User owns of the Desk lookup is in queriedDesksMap.keySet() and where the date is present or in the future
+            Map<Id, List<Reservation__c>> deskIdToResvsMap = new Map<Id, List<Reservation__c>>();
+            for(Reservation__c resv : [SELECT Id, Name, OwnerId, Owner.Name, Date__c, Desk__c, Desk__r.Name, 
+                                        Desk__r.Office__c, Desk__r.Office__r.Name, Desk__r.Floor_Number__c 
+                                        FROM Reservation__c WHERE Date__c >= TODAY
+                                        ORDER BY Date__c, Desk__c, Desk__r.Office__c, Desk__r.Floor_Number__c]
+               ){
+                   //Create reservationWrappers for each reservation to be displayed on the page
+                       reservationWrappers.add(new ReservationWrapper(resv)); 
+                   
+                   //Check if the User already has a Reservation for the selected date
+                   if(resv.OwnerId == currentUserId && resv.Date__c == selectedDate){
+                           userHasReservationForSelectedDate = true;  
+                   }
+                   
+                   //Assocate all Reservations to Desk Id by putting all Reservatons into a list and associating the list to a Desk Id in a map
+                   if(!deskIdToResvsMap.containsKey(resv.Desk__c)){
+                       deskIdToResvsMap.put(resv.Desk__c, new List<Reservation__c>{resv});
+                   }
+                   else{
+                       deskIdToResvsMap.get(resv.Desk__c).add(resv);
+                   }
+               }
+            
+
+            Boolean deskIsAvailable = true;
+            String reserveeName;
+            Integer deskFloorNumber;
+            for(Desk__c desk : queriedDesksMap.values()){
+				deskIsAvailable = true;
+				reserveeName = null;
+                //deskIdToResvsMap contains the Desk Id, that means there are Reservations for the current User
+                if(deskIdToResvsMap.containsKey(desk.Id)){
+                    //Loop through all the Reservations
+                    for(Reservation__c resv : deskIdToResvsMap.get(desk.Id)){
+                        //Check if there are any Reservations for the selected date
+                        if(resv.Date__c == selectedDate){
+                            deskIsAvailable = false;
+                            reserveeName = resv.Owner.Name;
+                            unavailableDesksCount++;
+                        }
+                    }   
+                }
+                
+                //Instantiate DeskWrappers to add to floorNumberToDeskWrappers to be displayed on the page
+                deskFloorNumber = (Integer)desk.Floor_Number__c;
+                
+                if(!floorNumberToDeskWrappers.containsKey(deskFloorNumber)){
+                    floorNumberToDeskWrappers.put(deskFloorNumber, new List<DeskWrapper>{new DeskWrapper(desk, deskIsAvailable, reserveeName)});
+                }
+                else{
+                    floorNumberToDeskWrappers.get(deskFloorNumber).add(new DeskWrapper(desk, deskIsAvailable, reserveeName));
+                }
+            }
+            
+            //If all desks are reserved, prompt the user with a note to try a different office or different date
+            if(unavailableDesksCount == queriedDesksMap.size()){
+                noDesksAvailable = true;
+                ApexPages.addMessage(new ApexPages.Message(ApexPages.severity.INFO, 'There are currently no desks available for this office and this date. Please try a different office or a different date.')); 
+                return;
+            }
+        }
+        //If userHasReservationForSelectedDate, then prompt the user with a note that the user already have a reservation for the selected date.
+        if(userHasReservationForSelectedDate){
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.severity.INFO, 'You currently have a reservation for this date. To change your reservation, please cancel your current reservation and make a new reservation.'));
+        }
+    }
+    
+    //Method to reserve a Desk. This is called from the Reserve button
+    public void reserveDesk(){
+        Desk__c selectedDesk;
+        
+        //Loop through all the DeskWrappers and check if there is a DeskWrapper selected
+        //  If there is a DeskWrapper selected, get the Desk associated to the DeskWrapper
+        for(List<DeskWrapper> dwList: floorNumberToDeskWrappers.values()){
+            for(DeskWrapper dw : dwList){
+                if(dw.selected){
+                    selectedDesk = dw.desk;	   
+                    break;
+                }
+            }
+        }
+        
+        //If there isn't a DeskWrapper selected and the User clicks on the Reserve button
+        //  Prompt the User with and Error message to selected a desk to reserve
+        //Else insert a new Reservation
+        if(selectedDesk == null){
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.severity.ERROR, 'Please select a desk to reserve.'));
+        }
+        else{            
+            try{
+                insert new Reservation__c(
+                    Desk__c = selectedDesk.Id, 
+                    Date__c = selectedDate
+                );
+            }
+            catch(Exception e){
+                ApexPages.addMessage(new ApexPages.Message(ApexPages.severity.ERROR, e.getMessage()));
+            }
+        }
+        
+        //Call getDesksAndReservations to reload Data on the page.
+        getDesksAndReservations();
+        
+    }
+    
+    //Method to cancel Reservations. This is called from the Cancel Reservations button
+    public void cancelReservations(){
+        List<Reservation__c> reservationsToDelete = new List<Reservation__c>();
+        
+        //Loop through all the ReservationWrappers and check if any are selected
+        //  If there ReservationWrappers selected, add the selected Reservations to a list to delete
+        for(ReservationWrapper rw : reservationWrappers){
+            if(rw.selected){
+                reservationsToDelete.add(rw.Reservation);
+            }
+        }
+        
+        //If there are no selected ReservationWrappers and the User clicks on Cancel Reservations button
+        //  Prompt the User with an Error message to select at least one Reservation to cancel
+        //Else delete the selected Reservations
+        if(reservationsToDelete.isEmpty()){
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.severity.ERROR, 'Please select at least one reservation to cancel.'));
+        }
+        else{
+            try{
+                delete reservationsToDelete;
+            }
+            catch(Exception e){
+                ApexPages.addMessage(new ApexPages.Message(ApexPages.severity.ERROR, e.getMessage()));
+            }   
+        }
+        
+        //Call getDesksAndReservations to reload Data on the page.
+        getDesksAndReservations();
+        
+    }
+    
+    //This is used for the dropdown to select an Office on the page.
+    public List<SelectOption> officeSelectOptions{
+        get{
+            if(officeSelectOptions == null){
+                officeSelectOptions = new List<SelectOption>();
+                officeMap = new Map<Id, Office__c>([SELECT Id, Name FROM Office__c ORDER BY CreatedDate]);
+                
+                if(officeMap.isEmpty()){
+                    ApexPages.addMessage(new ApexPages.Message(ApexPages.severity.ERROR, 'No office records were found in Salesforce.'));
+                }
+                
+                for(Office__c office : officeMap.values()){
+                    officeSelectOptions.add(new SelectOption(office.Id, office.Name));
+                }
+            }
+            return officeSelectOptions;
+        }
+        set;
+    }
+    
+    //This is used to render the Desk Available section on the page
+    public Integer floorNumberToDeskWrappersSize{
+        get{
+            return floorNumberToDeskWrappers.size();
+        }
+        private set;
+    }
+    
+    //Wrapper class to hold information about the Desk
+    public class DeskWrapper{
+        public Desk__c desk{get; set;}
+        public Boolean selected{get; set;}
+        public Boolean available{get; set;}
+        public String reservee{get; set;}
+        
+        public DeskWrapper(Desk__c desk, Boolean available, String reservee){
+            this.desk = desk;
+            this.selected = false;
+            this.available = available;
+            this.reservee = reservee;
+        }
+    }
+    
+    //Wrapper class to hold information about the Reservation	
+    public class ReservationWrapper{
+        public Reservation__c reservation{get; set;}
+        public Boolean selected{get; set;}
+        public String reformattedDate{get; set;}
+        
+        public ReservationWrapper(Reservation__c reservation){
+            this.reservation = reservation;
+            this.selected = false;
+            this.reformattedDate = reservation.Date__c.format();
+        }
+    }
+}

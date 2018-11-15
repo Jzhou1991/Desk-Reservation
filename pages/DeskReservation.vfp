@@ -1,0 +1,194 @@
+<apex:page controller="DeskReservationController" docType="html-5.0" sidebar="false" lightningStyleSheets="true">
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <apex:includeScript value="{!$Resource.jquery_min}"/>
+        <apex:includeScript value="{!$Resource.blockUI}"/>
+
+        <style>
+            .slds-scope .slds-size_1-of-4 {
+                width: 20%;  
+            }
+            
+            .reserveButton{
+                right: 5.5%;
+            }
+        </style>
+        
+        <script type="text/javascript"> 
+            function disableDeskCheckBoxes(selectedCheckBox){
+                for(var cb of document.getElementsByClassName("deskCheckbox")){
+                    if(cb != selectedCheckBox){
+                        cb.checked = false;   
+                    }  
+                }
+            }           
+            
+            function checkAllResvCheckBoxes(checkAllCheckBox){
+                if(checkAllCheckBox.checked){
+                    for(var cb of document.getElementsByClassName("reservationCheckbox")){
+                        cb.checked = true; 
+                    }   
+                }
+                else{
+                    for(var cb of document.getElementsByClassName("reservationCheckbox")){
+                        cb.checked = false; 
+                    }     
+                }
+            }    
+            
+            function blockPage(){          
+                $.blockUI({ css: { 
+                    border: 'none', 
+                    padding: '15px', 
+                    backgroundColor: '#000', 
+                    '-webkit-border-radius': '10px', 
+                    '-moz-border-radius': '10px', 
+                    opacity: .5, 
+                    color: '#fff' 
+                } });  
+            }
+        </script> 
+        
+        <article class="slds-card">
+            <apex:slds />
+            <apex:form >
+                <!-- Header -->
+                <div class="slds-page-header slds-text-heading_large">
+                    Desk Reservation
+                </div>
+                <apex:pageMessages />
+                <!-- Dropdown, Datepicker, and Submit button -->
+                <div class="slds-card__body slds-card__body_inner">
+                    <article class="slds-card slds-card_boundary slds-m-around_large">
+                        <div class="slds-card__header slds-text-heading_small">
+                            Please select an office and date to reserve a desk
+                        </div>
+                        <div class="slds-card__header slds-card__body slds-grid">
+                            <apex:selectList styleClass="slds-select slds-col slds-size_1-of-12 slds-m-around_xx-small" value="{!selectedOfficeId}" size="1" multiselect="false">
+                                <apex:selectOptions value="{!officeSelectOptions}"/>
+                            </apex:selectList>
+                            <apex:input styleClass="slds-datepicker slds-datepicker__filter slds-col slds-size_2-of-12 slds-m-around_xx-small" type="date" value="{!selectedDate}"/>
+                            <apex:commandButton id="submitButton" styleClass="slds-button slds-button_brand slds-col slds-size_1-of-12 slds-m-around_xx-small" value="Submit" action="{!getDesksAndReservations}" onclick="blockPage();"/>
+                        </div>
+                    </article>
+                </div>
+                
+                <!-- Desks Available -->
+                <apex:outputPanel rendered="{!floorNumberToDeskWrappersSize > 0}" id="desksAvailable">
+                    <div class="slds-card__body slds-card__body_inner">
+                        <div class="slds-card__header slds-text-heading_medium">
+                            Desks Available
+                        </div>
+                        <div align="right">
+                            <apex:commandButton styleClass="reserveButton slds-button slds-button_brand slds-col slds-size_1-of-12 slds-m-around_xx-small" value="Reserve" action="{!reserveDesk}" onclick="blockPage();" disabled="{!userHasReservationForSelectedDate || noDesksAvailable}"/>    
+                        </div>
+                        <div style="width: 90%; margin: auto;">
+                            <apex:repeat value="{!floorNumberToDeskWrappers}" var="floorNumber">
+                                <div class="slds-card slds-card_boundary slds-m-around_small">
+                                    <div class="slds-text-heading_small slds-m-around_small">
+                                        Floor {!floorNumber}
+                                    </div>  
+                                    
+                                    <apex:repeat value="{!floorNumberToDeskWrappers[floorNumber]}" var="dw">
+                                        <div class="slds-icon_container {!IF(dw.available, "slds-icon-custom-custom32", "slds-icon-custom-custom45")} slds-size_1-of-4 slds-size_2-of-8 slds-size_3-of-12 slds-m-left_xxx-small slds-m-around_large">
+                                            <div class="slds-p-top_x-small slds-align_absolute-center">
+                                                <apex:outputText value="{!dw.desk.Name}"/>
+                                            </div>
+                                            <div class="slds-align_absolute-center">
+                                                <img src="{!URLFOR($RESOURCE.SLDS, 'icons/custom/custom33_60.png')}" alt="" />
+                                                <apex:inputCheckbox styleClass="deskCheckbox" value="{!dw.selected}" onclick="disableDeskCheckBoxes(this);" disabled="{!!dw.available || userHasReservationForSelectedDate}"/>  
+                                            </div>
+                                            <div class="slds-p-bottom_x-small slds-p-left_small">
+                                                Reservee:
+                                                <apex:outputText value=" {!dw.reservee}" rendered="{!!dw.available}"/>
+                                            </div>
+                                        </div>
+                                    </apex:repeat>
+                                </div>
+                            </apex:repeat>
+                        </div>
+                        <div align="right">
+                            <apex:commandButton styleClass="reserveButton slds-button slds-button_brand slds-col slds-size_1-of-12 slds-m-around_xx-small" value="Reserve" action="{!reserveDesk}" onclick="blockPage();" disabled="{!userHasReservationForSelectedDate || noDesksAvailable}"/>    
+                        </div>
+                    </div>
+                </apex:outputPanel>
+                
+                <!-- Your Current Reservations -->
+                <apex:outputPanel rendered="{!reservationWrappers.size > 0}" id="currentReservations">
+                    <div class="slds-card__body slds-card__body_inner">
+                        <div class="slds-card__header slds-text-heading_medium">
+                            Current Reservations
+                        </div>
+                        <table class="slds-table slds-table_cell-buffer slds-table_bordered slds-m-around_xx-small">
+                            <thead>
+                                <tr class="slds-line-height_reset">
+                                    <th class="slds-text-title_caps" scope="col">
+                                        <apex:inputCheckbox onclick="checkAllResvCheckBoxes(this);"/>
+                                    </th>
+                                    <th class="slds-text-title_caps" scope="col">
+                                        <div class="slds-truncate" title="Name">Name</div>
+                                    </th>
+                                    <th class="slds-text-title_caps" scope="col">
+                                        <div class="slds-truncate" title="Date">Date</div>
+                                    </th>
+                                    <th class="slds-text-title_caps" scope="col">
+                                        <div class="slds-truncate" title="Desk">Desk</div>
+                                    </th>
+                                    <th class="slds-text-title_caps" scope="col">
+                                        <div class="slds-truncate" title="Office">Office</div>
+                                    </th>
+                                    <th class="slds-text-title_caps" scope="col">
+                                        <div class="slds-truncate" title="Desk">Floor #</div>
+                                    </th>
+                                    <th class="slds-text-title_caps" scope="col">
+                                        <div class="slds-truncate" title="Owner">Owner</div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <apex:repeat value="{!reservationWrappers}" var="rw">
+                                    <tr class="slds-hint-parent">
+                                        <td data-label="Selected" scope="row">
+                                            <div class="slds-truncate">
+                                                <apex:inputCheckbox styleClass="reservationCheckbox" value="{!rw.selected}" rendered="{!isSystemAdmin || contains(currentUserId, rw.reservation.OwnerId)}"/>
+                                            </div>
+                                        </td>
+                                        <td data-label="Name" scope="row">
+                                            <div class="slds-truncate">
+                                                <a href="/{!rw.reservation.Id}" target="_blank">{!rw.reservation.Name}</a>
+                                            </div>
+                                        </td>
+                                        <td data-label="Date">
+                                            <div class="slds-truncate">{!rw.reformattedDate}</div>
+                                        </td>
+                                        <td data-label="Desk">
+                                            <div class="slds-truncate">
+                                                <a href="/{!rw.reservation.Desk__c}" target="_blank">{!rw.reservation.Desk__r.Name}</a>
+                                            </div>
+                                        </td>
+                                        <td data-label="Office">
+                                            <div class="slds-truncate">
+                                                <a href="/{!rw.reservation.Desk__r.Office__c}" target="_blank">{!rw.reservation.Desk__r.Office__r.Name}</a>
+                                            </div>
+                                        </td>
+                                        <td data-label="Floor #">
+                                            <div class="slds-truncate">{!rw.reservation.Desk__r.Floor_Number__c}</div>
+                                        </td>
+                                        <td data-label="Office">
+                                            <div class="slds-truncate">
+                                                <a href="/{!rw.reservation.OwnerId}" target="_blank">{!rw.reservation.Owner.Name}</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </apex:repeat>
+                            </tbody>
+                        </table>
+                        <div align="right">
+                            <apex:commandButton styleClass="slds-button slds-button_brand slds-col slds-size_1-of-12 slds-m-around_xx-small" value="Cancel Reservations" action="{!cancelReservations}" onclick="blockPage();"/>    
+                        </div>
+                    </div>
+                </apex:outputPanel>
+            </apex:form>
+            <apex:pageMessages />
+        </article>
+    </html>
+</apex:page>
