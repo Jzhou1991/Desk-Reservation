@@ -1,18 +1,18 @@
 public class DuplicateService {
-	
+
     //Method to check for duplicate Objects with the same names
     public static void checkForDuplicates(Map<Id, SObject> oldObjectsMap, List<SObject> newObjectsList){
-		Map<String, List<SObject>> objNameToObjs = new Map<String, List<SObject>>();
-		String objType = newObjectsList.get(0).getSObjectType().getDescribe().getName();
-        
+        Map<String, List<SObject>> objNameToObjs = new Map<String, List<SObject>>();
+        String objType = newObjectsList.get(0).getSObjectType().getDescribe().getName();
+
         //Loop through all the new objects passed in and add the object to map with the Name as key and the object as value
         for(SObject obj : newObjectsList){
             String objName = (String)obj.get('Name');
             if(Trigger.isInsert || (Trigger.isUpdate && objName != (String)oldObjectsMap.get(obj.Id).get('Name'))){
-                populateMap(objNameToObjs, objName, obj);                        
+                populateMap(objNameToObjs, objName, obj);  
             }
         }
-        
+
         //Loop through all the keys of objNameToObjs
         //If there are more than 1 object per name, this means that ther are duplicates in the map
         for(String objName : objNameToObjs.keySet()){
@@ -23,10 +23,10 @@ public class DuplicateService {
                 objNameToObjs.remove(objName);
             }
         }
-        
+
         List<String> objNameList = new List<String>();
         objNameList.addAll(objNameToObjs.keySet());
-		
+
         //Query for all the objects where the names are related to the names in objNameList
         //If there objNameList contains any of the queried objects' names, this means that there is already existing objects with the same names
         //Add error to the objects
@@ -37,7 +37,7 @@ public class DuplicateService {
             }
         }
     }
-    
+
     public static void populateMap(Map<String, List<SObject>> objNameToObjs, String objName, SObject obj){
         if(!objNameToObjs.containsKey(objName)){
             objNameToObjs.put(objName, new List<SObject>{obj});
@@ -46,5 +46,5 @@ public class DuplicateService {
             objNameToObjs.get(objName).add(obj);
         }
     }
-    
+
 }

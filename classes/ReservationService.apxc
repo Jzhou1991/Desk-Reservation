@@ -1,20 +1,20 @@
 public class ReservationService {
-    
+
     public static void validateReservations(List<Reservation__c> reservations){
         Boolean thereAreDuplicates = false;
-        
+
         Map<Date, List<Reservation__c>> dateToResvsMap = new Map<Date, List<Reservation__c>>();
-        
+
         //Loop through all the new Reservations and put their Owner Ids into a Map as keys.
         for(Reservation__c resv : reservations){
             if(!dateToResvsMap.containsKey(resv.Date__c)){
-                dateToResvsMap.put(resv.Date__c, new List<Reservation__c>{resv});   
+                dateToResvsMap.put(resv.Date__c, new List<Reservation__c>{resv});
             }
             else{
                 dateToResvsMap.get(resv.Date__c).add(resv);
             }
         }
-        
+
         //Loop through all the Date of dateToResvsMap
         //If there are duplicate reservations with the same owner and same date, prompt the user with error message
         for(Reservation__c resv : reservations){
@@ -27,7 +27,7 @@ public class ReservationService {
                     resv.Date__c == resv2.Date__c
                 ){
                     thereAreDuplicates = true;
-                	resv.addError('Duplicate reservation records with the same date(' + resv.Date__c.format() + ') were found in insert/update list.');    
+                    resv.addError('Duplicate reservation records with the same date(' + resv.Date__c.format() + ') were found in insert/update list.');
                 }
             }
         }
@@ -35,7 +35,7 @@ public class ReservationService {
         if(!thereAreDuplicates){
             //Query for all Reservations in Salesforce with the same date
             List<Reservation__c> resvList = [SELECT Id, OwnerId, Date__c, Desk__c FROM Reservation__c WHERE Date__c IN :dateToResvsMap.keySet()];
-            
+
             //Check if the new Reservations have the same Dates as any existing Reservations with the same Owner.
             for(Reservation__c newResv : reservations){
                 for(Reservation__c existingResv : resvList){
@@ -52,5 +52,5 @@ public class ReservationService {
             }
         }
     }
-    
+
 }

@@ -12,42 +12,42 @@
                 right: 5.5%;
             }
         </style>
-        
+
         <script type="text/javascript"> 
             function disableDeskCheckBoxes(selectedCheckBox){
                 for(var cb of document.getElementsByClassName("deskCheckbox")){
                     if(cb != selectedCheckBox){
-                        cb.checked = false;   
-                    }  
+                        cb.checked = false;
+                    }
                 }
-            }           
-            
+            }
+
             function checkAllResvCheckBoxes(checkAllCheckBox){
                 if(checkAllCheckBox.checked){
                     for(var cb of document.getElementsByClassName("reservationCheckbox")){
                         cb.checked = true; 
-                    }   
+                    }
                 }
                 else{
                     for(var cb of document.getElementsByClassName("reservationCheckbox")){
                         cb.checked = false; 
-                    }     
+                    }
                 }
-            }    
-            
-            function blockPage(){          
-                $.blockUI({ css: { 
-                    border: 'none', 
-                    padding: '15px', 
-                    backgroundColor: '#000', 
-                    '-webkit-border-radius': '10px', 
-                    '-moz-border-radius': '10px', 
-                    opacity: .5, 
-                    color: '#fff' 
-                } });  
             }
-        </script> 
-        
+
+            function blockPage(){
+                $.blockUI({ css: {
+                    border: 'none',
+                    padding: '15px',
+                    backgroundColor: '#000',
+                    '-webkit-border-radius': '10px',
+                    '-moz-border-radius': '10px',
+                    opacity: .5,
+                    color: '#fff'
+                } });
+            }
+        </script>
+
         <article class="slds-card">
             <apex:slds />
             <apex:form >
@@ -71,7 +71,7 @@
                         </div>
                     </article>
                 </div>
-                
+
                 <!-- Desks Available -->
                 <apex:outputPanel rendered="{!floorNumberToDeskWrappersSize > 0}" id="desksAvailable">
                     <div class="slds-card__body slds-card__body_inner">
@@ -79,15 +79,15 @@
                             Desks Available
                         </div>
                         <div align="right">
-                            <apex:commandButton styleClass="reserveButton slds-button slds-button_brand slds-col slds-size_1-of-12 slds-m-around_xx-small" value="Reserve" action="{!reserveDesk}" onclick="blockPage();" disabled="{!userHasReservationForSelectedDate || noDesksAvailable}"/>    
+                            <apex:commandButton styleClass="reserveButton slds-button slds-button_brand slds-col slds-size_1-of-12 slds-m-around_xx-small" value="Reserve" action="{!reserveDesk}" onclick="blockPage();" disabled="{!userHasReservationForSelectedDate || noDesksAvailable}"/>
                         </div>
                         <div style="width: 90%; margin: auto;">
                             <apex:repeat value="{!floorNumberToDeskWrappers}" var="floorNumber">
                                 <div class="slds-card slds-card_boundary slds-m-around_small">
                                     <div class="slds-text-heading_small slds-m-around_small">
                                         Floor {!floorNumber}
-                                    </div>  
-                                    
+                                    </div>
+
                                     <apex:repeat value="{!floorNumberToDeskWrappers[floorNumber]}" var="dw">
                                         <div class="slds-icon_container {!IF(dw.available, "slds-icon-custom-custom32", "slds-icon-custom-custom45")} slds-size_1-of-4 slds-size_2-of-8 slds-size_3-of-12 slds-m-left_xxx-small slds-m-around_large">
                                             <div class="slds-p-top_x-small slds-align_absolute-center">
@@ -107,11 +107,11 @@
                             </apex:repeat>
                         </div>
                         <div align="right">
-                            <apex:commandButton styleClass="reserveButton slds-button slds-button_brand slds-col slds-size_1-of-12 slds-m-around_xx-small" value="Reserve" action="{!reserveDesk}" onclick="blockPage();" disabled="{!userHasReservationForSelectedDate || noDesksAvailable}"/>    
+                            <apex:commandButton styleClass="reserveButton slds-button slds-button_brand slds-col slds-size_1-of-12 slds-m-around_xx-small" value="Reserve" action="{!reserveDesk}" onclick="blockPage();" disabled="{!userHasReservationForSelectedDate || noDesksAvailable}"/>
                         </div>
                     </div>
                 </apex:outputPanel>
-                
+
                 <!-- Your Current Reservations -->
                 <apex:outputPanel rendered="{!reservationWrappers.size > 0}" id="currentReservations">
                     <div class="slds-card__body slds-card__body_inner">
@@ -183,7 +183,7 @@
                             </tbody>
                         </table>
                         <div align="right">
-                            <apex:commandButton styleClass="slds-button slds-button_brand slds-col slds-size_1-of-12 slds-m-around_xx-small" value="Cancel Reservations" action="{!cancelReservations}" onclick="blockPage();"/>    
+                            <apex:commandButton styleClass="slds-button slds-button_brand slds-col slds-size_1-of-12 slds-m-around_xx-small" value="Cancel Reservations" action="{!cancelReservations}" onclick="blockPage();"/>
                         </div>
                     </div>
                 </apex:outputPanel>

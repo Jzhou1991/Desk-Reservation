@@ -6,35 +6,35 @@ public class DuplicateServiceTest {
 
         Account a = new Account(Name = 'Test Account');
         Account a2 = new Account(Name = 'Test Account');
-		
+
         Test.startTest();
-		/**
-         * 	Negative test case for when inserting a batch of Accounts with the same name
+        /**
+         *  Negative test case for when inserting a batch of Accounts with the same name
          *  Result: The user should be prompted with the message: 
          *  -'Duplicate Account record with the same Name(Test Account) was found in insert/update list.'
-        **/        
+        **/
         try{
             insert new List<Account>{a, a2};
         }
         catch(Exception e){
             //System.assertEquals(null, e.getMessage());
-        	System.assert(e.getMessage().contains('Duplicate Account record with the same Name(Test Account) was found in insert/update list.'));    
+            System.assert(e.getMessage().contains('Duplicate Account record with the same Name(Test Account) was found in insert/update list.'));
         }
-        
+
         /**
-         * 	Negative test case for when inserting an Account with the same name as an existing Account in Salesforce
+         *  Negative test case for when inserting an Account with the same name as an existing Account in Salesforce
          *  Result: The user should be prompted with the message: 
          *  -'Duplicate Account record with the same Name(Test Account) was found in Salesforce.'
-        **/ 
+        **/
         try{
-			insert a;
+            insert a;
         }
         catch(Exception e){
-            System.assert(e.getMessage().contains('Duplicate Account record with the same Name(Test Account) was found in Salesforce.'));    
+            System.assert(e.getMessage().contains('Duplicate Account record with the same Name(Test Account) was found in Salesforce.'));
         }
-        
+
         /**
-         * 	Positive test case for when inserting a batch of Accounts with a unique name
+         *  Positive test case for when inserting a batch of Accounts with a unique name
          *  Result: The Account is inserted successfully
         **/
         try{
@@ -42,29 +42,29 @@ public class DuplicateServiceTest {
             a2.Name = 'Test Account 3';
             insert new List<Account>{a, a2};
             System.assert(true, 'Account inserted successfully');
-            
+
             System.assertEquals(1, [SELECT COUNT() FROM Account WHERE Name = 'Test Account 2']);
         }
         catch(Exception e){
-            System.assert(e.getMessage() == null);    
+            System.assert(e.getMessage() == null);
         }
 
         /**
-         * 	Negative test case for when inserting a batch of Accounts with the same name
+         *  Negative test case for when inserting a batch of Accounts with the same name
          *  Result: The user should be prompted with the message: 
          *  -'Duplicate Account record with the same Name(Test Account 4) was found in insert/update list.'
-        **/ 
+        **/
         try{
             a.Name = 'Test Account 4';
             a2.Name = 'Test Account 4';
             update new List<Account>{a, a2};
         }
         catch(Exception e){
-            System.assert(e.getMessage().contains('Duplicate Account record with the same Name(Test Account 4) was found in insert/update list.'));    
-        } 
+            System.assert(e.getMessage().contains('Duplicate Account record with the same Name(Test Account 4) was found in insert/update list.'));
+        }
         
         /**
-         * 	Negative test case for when updating an Account with the same name as an existing Account in Salesforce
+         *  Negative test case for when updating an Account with the same name as an existing Account in Salesforce
          *  Result: The user should be prompted with the message: 
          *  -'Duplicate Account record with the same Name(Test Account) was found in Salesforce.'
         **/
@@ -73,22 +73,22 @@ public class DuplicateServiceTest {
             update a2;
         }
         catch(Exception e){
-            System.assert(e.getMessage().contains('Duplicate Account record with the same Name(Test Account) was found in Salesforce.'));    
-        }   
-        
+            System.assert(e.getMessage().contains('Duplicate Account record with the same Name(Test Account) was found in Salesforce.'));
+        }
+
         /**
-         * 	Positive test case for when inserting a batch of Accounts with a unique name
+         *  Positive test case for when inserting a batch of Accounts with a unique name
          *  Result: The Account is updated successfully
         **/
         try{
             a2.Name = 'Test Account 4';
-			update a2;
+            update a2;
             System.assert(true, 'Account updated successfully');
             
             System.assertEquals(1, [SELECT COUNT() FROM Account WHERE Name = 'Test Account 4']);
         }
         catch(Exception e){
-            System.assert(e.getMessage() == null);    
+            System.assert(e.getMessage() == null);
         }
         Test.stopTest();
     }
